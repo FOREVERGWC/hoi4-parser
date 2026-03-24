@@ -1,0 +1,1 @@
+trigger = { world_tension = >= 0.35 threat = < 10 status = == active }

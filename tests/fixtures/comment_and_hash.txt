@@ -1,0 +1,2 @@
+name = "A#B" # trailing comment
+tag = CHI

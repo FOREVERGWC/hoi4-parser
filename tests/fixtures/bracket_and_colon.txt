@@ -1,0 +1,2 @@
+token = [From.GetID]
+path = core:china
