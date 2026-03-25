@@ -18,7 +18,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, Hoi4ParserError> {
     while i < chars.len() {
         let ch = chars[i];
         match ch {
-            '\r' | ' ' | '\t' => {
+            '\u{feff}' | '\r' | ' ' | '\t' => {
                 i += 1;
             }
             '\n' => {
@@ -102,7 +102,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, Hoi4ParserError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Token, tokenize};
+    use super::{tokenize, Token};
 
     #[test]
     fn should_tokenize_basic_assignment() {
@@ -119,7 +119,8 @@ mod tests {
 
     #[test]
     fn should_ignore_comments_but_keep_newline() {
-        let tokens = tokenize("tag = CHI # comment\nname = \"A\"").expect("tokenize should succeed");
+        let tokens =
+            tokenize("tag = CHI # comment\nname = \"A\"").expect("tokenize should succeed");
         assert_eq!(
             tokens,
             vec![
@@ -151,5 +152,18 @@ mod tests {
     fn should_fail_for_unclosed_string() {
         let err = tokenize("name = \"A").expect_err("tokenize should fail");
         assert!(err.to_string().contains("字符串未闭合"));
+    }
+
+    #[test]
+    fn should_ignore_utf8_bom() {
+        let tokens = tokenize("\u{feff}tag = CHI").expect("tokenize should succeed");
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Ident("tag".to_string()),
+                Token::Equals,
+                Token::Ident("CHI".to_string())
+            ]
+        );
     }
 }

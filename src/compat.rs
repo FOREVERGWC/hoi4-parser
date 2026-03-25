@@ -10,7 +10,10 @@ pub fn export_key(entry: &Entry, with_duplicate_suffix: bool) -> String {
 }
 
 pub fn export_entry(entry: &Entry, with_duplicate_suffix: bool) -> (String, Value) {
-    (export_key(entry, with_duplicate_suffix), entry.value().clone())
+    (
+        export_key(entry, with_duplicate_suffix),
+        entry.value().clone(),
+    )
 }
 
 pub fn normalize_scalar_for_parse(raw: &str) -> String {
@@ -50,7 +53,8 @@ pub fn restore_compat_operators(rendered: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        escape_scalar_for_generate, export_key, normalize_scalar_for_parse, restore_compat_operators,
+        escape_scalar_for_generate, export_key, normalize_scalar_for_parse,
+        restore_compat_operators,
     };
     use crate::{Entry, EntryMetadata, Value};
 

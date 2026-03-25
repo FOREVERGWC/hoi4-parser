@@ -15,7 +15,7 @@ pub use compat::{
 pub use error::Hoi4ParserError;
 pub use generator::generate_document;
 pub use nested::{decode_nested_quoted, encode_nested_quoted};
-pub use perf::{BenchReport, benchmark_round_trip};
+pub use perf::{benchmark_round_trip, BenchReport};
 pub use tokenizer::Token;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,14 +74,15 @@ pub fn generate(document: &Document) -> Result<String, Hoi4ParserError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Entry, EntryMetadata, ObjectNode, Value, generate, parse};
+    use super::{generate, parse, Entry, EntryMetadata, ObjectNode, Value};
 
     #[test]
     fn parse_and_generate_round_trip_source() {
         let source = "country = { tag = CHI }";
         let doc = parse(source).expect("parse should succeed");
         let output = generate(&doc).expect("generate should succeed");
-        assert_eq!(output, source);
+        let expected = "country = {\n\ttag = CHI\n}";
+        assert_eq!(output, expected);
         assert!(matches!(doc.root(), Value::Object(_)));
     }
 

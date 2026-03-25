@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use crate::{Entry, EntryMetadata, Hoi4ParserError, ObjectNode, Value};
 use crate::compat::normalize_scalar_for_parse;
 use crate::nested::decode_nested_quoted;
 use crate::tokenizer::Token;
+use crate::{Entry, EntryMetadata, Hoi4ParserError, ObjectNode, Value};
 
 pub fn parse_root(tokens: &[Token]) -> Result<Value, Hoi4ParserError> {
     let mut parser = Parser::new(tokens);
@@ -37,9 +37,8 @@ impl<'a> Parser<'a> {
                     return Ok(object);
                 }
                 Token::RBrace => {
-                    return Err(Hoi4ParserError::Parse {
-                        message: "出现多余的右花括号 '}'".to_string(),
-                    });
+                    // 容错：根级别遇到多余右花括号时忽略，兼容部分游戏原文件。
+                    self.pos += 1;
                 }
                 Token::Ident(_) => {
                     let mut entry = self.parse_entry()?;
@@ -72,6 +71,7 @@ impl<'a> Parser<'a> {
     fn parse_entry(&mut self) -> Result<Entry, Hoi4ParserError> {
         let key = self.expect_ident()?;
         self.expect_equals()?;
+        self.skip_newlines();
         let mut value = if matches!(self.peek(), Some(Token::LBrace)) {
             self.parse_value()?
         } else {
@@ -115,9 +115,8 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 }
                 Token::LBrace => {
-                    return Err(Hoi4ParserError::Parse {
-                        message: "标量值中不支持未转义的 '{'".to_string(),
-                    });
+                    let braced = self.parse_braced_scalar_block()?;
+                    parts.push(braced);
                 }
             }
         }
@@ -129,6 +128,49 @@ impl<'a> Parser<'a> {
         }
 
         Ok(Value::Scalar(parts.join(" ")))
+    }
+
+    fn parse_braced_scalar_block(&mut self) -> Result<String, Hoi4ParserError> {
+        let mut parts: Vec<String> = Vec::new();
+        let mut depth = 0usize;
+
+        while let Some(token) = self.peek() {
+            match token {
+                Token::LBrace => {
+                    depth += 1;
+                    parts.push("{".to_string());
+                    self.pos += 1;
+                }
+                Token::RBrace => {
+                    if depth == 0 {
+                        return Err(Hoi4ParserError::Parse {
+                            message: "花括号未闭合，缺少 '{'".to_string(),
+                        });
+                    }
+                    depth -= 1;
+                    parts.push("}".to_string());
+                    self.pos += 1;
+                    if depth == 0 {
+                        return Ok(parts.join(" "));
+                    }
+                }
+                Token::Ident(s) | Token::StringLiteral(s) => {
+                    parts.push(normalize_scalar_for_parse(s));
+                    self.pos += 1;
+                }
+                Token::Equals => {
+                    parts.push("=".to_string());
+                    self.pos += 1;
+                }
+                Token::Newline => {
+                    self.pos += 1;
+                }
+            }
+        }
+
+        Err(Hoi4ParserError::Parse {
+            message: "标量中的花括号块未闭合，缺少 '}'".to_string(),
+        })
     }
 
     fn parse_value(&mut self) -> Result<Value, Hoi4ParserError> {
@@ -178,6 +220,7 @@ impl<'a> Parser<'a> {
     }
 
     fn expect_equals(&mut self) -> Result<(), Hoi4ParserError> {
+        self.skip_newlines();
         match self.peek() {
             Some(Token::Equals) => {
                 self.pos += 1;
@@ -189,6 +232,12 @@ impl<'a> Parser<'a> {
             None => Err(Hoi4ParserError::Parse {
                 message: "期望 '='，但输入已结束".to_string(),
             }),
+        }
+    }
+
+    fn skip_newlines(&mut self) {
+        while matches!(self.peek(), Some(Token::Newline)) {
+            self.pos += 1;
         }
     }
 
@@ -222,17 +271,16 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Err(Hoi4ParserError::Parse {
-            message: "数组块未闭合，缺少 '}'".to_string(),
-        })
+        // 容错：到达文件末尾时，允许数组块隐式闭合。
+        Ok(items)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::parse_root;
-    use crate::{Value, compat::export_key};
     use crate::tokenizer::tokenize;
+    use crate::{compat::export_key, Value};
 
     #[test]
     fn should_parse_nested_object() {
@@ -305,6 +353,71 @@ mod tests {
     #[test]
     fn should_parse_array_style_block() {
         let input = "names = { \"A\" \"B\" \"C\" }";
+        let tokens = tokenize(input).expect("tokenize should succeed");
+        let root = parse_root(&tokens).expect("parse should succeed");
+        let Value::Object(root_object) = root else {
+            panic!("root should be object");
+        };
+        assert!(matches!(
+            root_object.entries()[0].value(),
+            Value::Array(items) if items.len() == 3
+        ));
+    }
+
+    #[test]
+    fn should_parse_rgb_block_as_scalar_sequence() {
+        let input = "color = rgb { 153 0 51 }";
+        let tokens = tokenize(input).expect("tokenize should succeed");
+        let root = parse_root(&tokens).expect("parse should succeed");
+        let Value::Object(root_object) = root else {
+            panic!("root should be object");
+        };
+        assert!(matches!(
+            root_object.entries()[0].value(),
+            Value::Scalar(v) if v == "rgb { 153 0 51 }"
+        ));
+    }
+
+    #[test]
+    fn should_allow_newline_between_key_and_equals() {
+        let input = "foo\n= bar";
+        let tokens = tokenize(input).expect("tokenize should succeed");
+        let root = parse_root(&tokens).expect("parse should succeed");
+        let Value::Object(root_object) = root else {
+            panic!("root should be object");
+        };
+        assert!(matches!(
+            root_object.entries()[0].value(),
+            Value::Scalar(v) if v == "bar"
+        ));
+    }
+
+    #[test]
+    fn should_allow_newline_between_equals_and_object_value() {
+        let input = "foo =\n{ bar = baz }";
+        let tokens = tokenize(input).expect("tokenize should succeed");
+        let root = parse_root(&tokens).expect("parse should succeed");
+        let Value::Object(root_object) = root else {
+            panic!("root should be object");
+        };
+        assert!(matches!(root_object.entries()[0].value(), Value::Object(_)));
+    }
+
+    #[test]
+    fn should_ignore_extra_rbrace_at_root() {
+        let input = "foo = bar\n}";
+        let tokens = tokenize(input).expect("tokenize should succeed");
+        let root = parse_root(&tokens).expect("parse should succeed");
+        let Value::Object(root_object) = root else {
+            panic!("root should be object");
+        };
+        assert_eq!(root_object.entries().len(), 1);
+        assert_eq!(root_object.entries()[0].key(), "foo");
+    }
+
+    #[test]
+    fn should_tolerate_unclosed_array_at_eof() {
+        let input = "items = { 1 2 3";
         let tokens = tokenize(input).expect("tokenize should succeed");
         let root = parse_root(&tokens).expect("parse should succeed");
         let Value::Object(root_object) = root else {

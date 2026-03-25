@@ -40,11 +40,7 @@ impl Entry {
         }
     }
 
-    pub fn with_metadata(
-        key: impl Into<String>,
-        value: Value,
-        metadata: EntryMetadata,
-    ) -> Self {
+    pub fn with_metadata(key: impl Into<String>, value: Value, metadata: EntryMetadata) -> Self {
         Self {
             key: key.into(),
             value,

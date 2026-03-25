@@ -1,5 +1,5 @@
-use crate::{Document, Entry, Hoi4ParserError, Value, encode_nested_quoted};
 use crate::compat::escape_scalar_for_generate;
+use crate::{encode_nested_quoted, Document, Entry, Hoi4ParserError, Value};
 
 pub fn generate_document(document: &Document) -> Result<String, Hoi4ParserError> {
     match document.root() {
@@ -7,7 +7,7 @@ pub fn generate_document(document: &Document) -> Result<String, Hoi4ParserError>
             let lines = root
                 .entries()
                 .iter()
-                .map(|entry| generate_entry(entry, 0, true))
+                .map(|entry| generate_entry(entry, 0, false))
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(lines.join("\n"))
         }
@@ -15,7 +15,11 @@ pub fn generate_document(document: &Document) -> Result<String, Hoi4ParserError>
     }
 }
 
-fn generate_value(value: &Value, indent: usize, inline_object: bool) -> Result<String, Hoi4ParserError> {
+fn generate_value(
+    value: &Value,
+    indent: usize,
+    inline_object: bool,
+) -> Result<String, Hoi4ParserError> {
     match value {
         Value::Scalar(s) => Ok(escape_scalar_for_generate(s)),
         Value::Array(items) => {
@@ -54,7 +58,11 @@ fn generate_value(value: &Value, indent: usize, inline_object: bool) -> Result<S
     }
 }
 
-fn generate_entry(entry: &Entry, indent: usize, inline_object: bool) -> Result<String, Hoi4ParserError> {
+fn generate_entry(
+    entry: &Entry,
+    indent: usize,
+    inline_object: bool,
+) -> Result<String, Hoi4ParserError> {
     if entry.metadata().nested_quoted {
         let inner = generate_nested_payload(entry.value(), indent + 1)?;
         let encoded = encode_nested_quoted(&inner);
@@ -62,9 +70,14 @@ fn generate_entry(entry: &Entry, indent: usize, inline_object: bool) -> Result<S
     }
 
     match entry.value() {
-        Value::Object(_) if !inline_object => {
+        Value::Object(obj) if !inline_object && !obj.entries().is_empty() => {
             let body = generate_value(entry.value(), indent + 1, false)?;
-            Ok(format!("{} = {{\n{}\n{}}}", entry.key(), body, "\t".repeat(indent)))
+            Ok(format!(
+                "{} = {{\n{}\n{}}}",
+                entry.key(),
+                body,
+                "\t".repeat(indent)
+            ))
         }
         _ => {
             let value = generate_value(entry.value(), indent + 1, true)?;

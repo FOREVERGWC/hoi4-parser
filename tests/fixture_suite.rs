@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use hoi4_parser::{Value, export_key, generate, parse};
+use hoi4_parser::{export_key, generate, parse, Value};
 
 fn fixture_path(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -116,3 +116,15 @@ fn fixture_array_block_should_round_trip_semantically() {
 
     assert_eq!(first.root(), second.root());
 }
+
+#[test]
+fn fixture_rgb_block_scalar_should_parse_and_round_trip() {
+    let source = read_fixture("rgb_block_scalar.txt");
+    let first = parse(&source).expect("parse should succeed");
+    let rendered = generate(&first).expect("generate should succeed");
+    let second = parse(&rendered).expect("reparse should succeed");
+
+    assert_eq!(first.root(), second.root());
+    assert!(rendered.contains("rgb { 153 0 51 }"));
+}
+

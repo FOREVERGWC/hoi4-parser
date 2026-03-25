@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use crate::{Hoi4ParserError, generate, parse};
+use crate::{generate, parse, Hoi4ParserError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BenchReport {
@@ -10,7 +10,10 @@ pub struct BenchReport {
     pub input_bytes: usize,
 }
 
-pub fn benchmark_round_trip(input: &str, iterations: usize) -> Result<BenchReport, Hoi4ParserError> {
+pub fn benchmark_round_trip(
+    input: &str,
+    iterations: usize,
+) -> Result<BenchReport, Hoi4ParserError> {
     if iterations == 0 {
         return Err(Hoi4ParserError::Generate {
             message: "迭代次数必须大于 0".to_string(),
