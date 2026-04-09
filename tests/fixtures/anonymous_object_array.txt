@@ -1,0 +1,10 @@
+doctrine = {
+	milestones = {
+		{
+			category_fighter = {
+				air_agility = 0.1
+			}
+			air_intercept_efficiency = 0.2
+		}
+	}
+}

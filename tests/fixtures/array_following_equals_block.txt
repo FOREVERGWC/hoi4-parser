@@ -1,0 +1,6 @@
+slot = {
+	fixed_ship_battery_slot = {
+		any_of = { dp_light_battery_1 ship_light_battery_1 }
+		upgrade > current
+	}
+}

@@ -1,0 +1,8 @@
+collection = {
+	operators = {
+		faction_members
+		limit = {
+			has_government = democratic
+		}
+	}
+}

@@ -1,0 +1,6 @@
+achievement = {
+	has_navy_size = {
+		unit = battleship
+		size > 9
+	}
+}

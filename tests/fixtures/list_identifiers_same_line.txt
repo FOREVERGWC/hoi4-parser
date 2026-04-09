@@ -1,0 +1,5 @@
+theater = {
+	preferred_countries = {
+		GER SLO
+	}
+}

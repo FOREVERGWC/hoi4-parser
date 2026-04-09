@@ -1,0 +1,7 @@
+achievement = {
+	happened = {
+		NOT = { has_global_flag = achievement_france_surrender }
+		has_capitulated = no
+		date > 1947.12.31
+	}
+}

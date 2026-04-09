@@ -1,0 +1,7 @@
+climate = {
+	change_camo_when = { snow }
+	forbid_camo_when = { desert }
+}
+climate = {
+	change_camo_when = { snow }
+}

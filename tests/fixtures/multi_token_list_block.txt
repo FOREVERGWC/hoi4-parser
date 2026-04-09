@@ -1,0 +1,5 @@
+modifiers = {
+	fighter_good = {
+		type = { fighter heavy_fighter interceptor }
+	}
+}

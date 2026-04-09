@@ -3,6 +3,7 @@ pub enum Value {
     Scalar(String),
     Array(Vec<Value>),
     Object(ObjectNode),
+    AnonymousObject(ObjectNode),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

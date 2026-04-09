@@ -1,0 +1,4 @@
+ai_equipment = {
+	blocked_for = {}
+	available_for = {}
+}

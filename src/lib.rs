@@ -45,13 +45,20 @@ impl Document {
 ///
 /// 当前已接入 tokenizer 与 parser，支持基础键值与嵌套对象解析。
 pub fn parse(input: &str) -> Result<Document, Hoi4ParserError> {
+    parse_owned(input.to_string())
+}
+
+/// 解析 Paradox 文本（拥有所有权）为文档结构。
+///
+/// 当调用方已经持有 `String` 时，优先使用此 API 可避免额外拷贝。
+pub fn parse_owned(input: String) -> Result<Document, Hoi4ParserError> {
     if input.trim().is_empty() {
         return Err(Hoi4ParserError::Parse {
             message: "输入为空，无法解析".to_string(),
         });
     }
 
-    let tokens = tokenizer::tokenize(input)?;
+    let tokens = tokenizer::tokenize(&input)?;
     let root = parser::parse_root(&tokens)?;
     Ok(Document::new(root, input))
 }
@@ -119,5 +126,135 @@ mod tests {
         let second_doc = parse(&regenerated).expect("second parse should succeed");
 
         assert_eq!(first_doc.root(), second_doc.root());
+    }
+
+    #[test]
+    fn parse_and_generate_should_trim_direct_decimal_zeroes_and_nested_payload_numbers() {
+        let source = r#"
+character = {
+	advisor = {
+		ai_will_do = {
+			factor = 1.000
+		}
+	}
+	effect = "set_variable = { name = \"x\" value = 1.000 }"
+}
+"#;
+        let doc = parse(source).expect("parse should succeed");
+        let output = generate(&doc).expect("generate should succeed");
+
+        assert!(
+            output.contains("factor = 1\n"),
+            "expected direct decimal trimmed, got:\n{output}"
+        );
+        assert!(
+            output.contains("effect = \"set_variable = { name = \\\"x\\\" value = 1 }\""),
+            "expected nested payload number trimmed, got:\n{output}"
+        );
+    }
+
+    #[test]
+    fn parse_and_generate_should_trim_operator_expression_numbers_including_nested_payloads() {
+        let source = r#"
+limit = {
+	has_war_support < 0.50
+}
+effect = "limit = { has_war_support < 0.50 name = \"x\" }"
+"#;
+        let doc = parse(source).expect("parse should succeed");
+        let output = generate(&doc).expect("generate should succeed");
+
+        assert!(
+            output.contains("has_war_support < 0.5"),
+            "expected operator expression number trimmed, got:\n{output}"
+        );
+        assert!(
+            output.contains("effect = \"limit = { has_war_support < 0.5 name = \\\"x\\\" }\""),
+            "expected nested payload number trimmed, got:\n{output}"
+        );
+    }
+
+    #[test]
+    fn parse_and_generate_should_trim_template_counter_including_nested_payloads() {
+        let source = r#"
+division_template = {
+	template_counter = 06
+}
+effect = "division_template = { template_counter = 07 name = \"x\" }"
+"#;
+        let doc = parse(source).expect("parse should succeed");
+        let output = generate(&doc).expect("generate should succeed");
+
+        assert!(
+            output.contains("template_counter = 6"),
+            "expected direct template_counter trimmed, got:\n{output}"
+        );
+        assert!(
+            output.contains(
+                "effect = \"division_template = { template_counter = 7 name = \\\"x\\\" }\""
+            ),
+            "expected nested template_counter trimmed, got:\n{output}"
+        );
+    }
+
+    #[test]
+    fn parse_and_generate_should_keep_anonymous_optional_assets_blocks() {
+        let source = r#"
+create_equipment_variant = {
+	name = "Sydney Class"
+	type = ship_hull_cruiser_2
+	optional_assets = {
+		{
+			icon = "GFX_commonwealth_light_cruiser_hobart"
+			model = "commonwealth_gfx_light_cruiser_entity"
+		}
+	}
+}
+"#;
+        let first_doc = parse(source).expect("parse should succeed");
+        let output = generate(&first_doc).expect("generate should succeed");
+        let second_doc = parse(&output).expect("round-trip parse should succeed");
+
+        assert!(
+            output.contains("optional_assets = {\n\t\t{\n"),
+            "expected anonymous block under optional_assets, got:\n{output}"
+        );
+        assert!(
+            !output.contains("# = {"),
+            "should not synthesize fake key for anonymous block, got:\n{output}"
+        );
+
+        let Value::Object(root_object) = second_doc.root() else {
+            panic!("root should be object");
+        };
+        let Value::Object(variant) = root_object.entries()[0].value() else {
+            panic!("create_equipment_variant should be object");
+        };
+        let optional_assets = variant
+            .entries()
+            .iter()
+            .find(|entry| entry.key() == "optional_assets")
+            .expect("optional_assets should exist");
+        let Value::Array(items) = optional_assets.value() else {
+            panic!("optional_assets should remain array");
+        };
+        assert_eq!(items.len(), 1, "expected one anonymous object item");
+        let Value::AnonymousObject(asset_object) = &items[0] else {
+            panic!("anonymous optional_assets item should remain anonymous object");
+        };
+        assert!(
+            asset_object
+                .entries()
+                .iter()
+                .any(|entry| entry.key() == "icon"),
+            "anonymous optional_assets item should keep icon field"
+        );
+        assert!(
+            asset_object
+                .entries()
+                .iter()
+                .any(|entry| entry.key() == "model"),
+            "anonymous optional_assets item should keep model field"
+        );
     }
 }

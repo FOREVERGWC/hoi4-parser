@@ -1,0 +1,12 @@
+ability = {
+	CHI_force_attack = {
+		ai_will_do = {
+			modifier = {
+				FROM = {
+					has_war_support > 0.1
+					command_power > 1.0
+				}
+			}
+		}
+	}
+}

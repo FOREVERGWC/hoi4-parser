@@ -1,0 +1,9 @@
+ability = {
+	test = {
+		modifier = {
+			check_variable = {
+				num_units_offensive_combats > 6
+			}
+		}
+	}
+}

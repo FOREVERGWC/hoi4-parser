@@ -1,0 +1,3 @@
+ideas = {
+	check_variable = { num_owned_controlled_states <controlled_owned_75 }
+}
