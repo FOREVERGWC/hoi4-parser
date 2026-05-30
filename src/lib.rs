@@ -2,6 +2,7 @@ mod ast;
 mod compat;
 mod error;
 mod generator;
+mod loc;
 mod nested;
 mod parser;
 mod perf;
@@ -14,6 +15,7 @@ pub use compat::{
 };
 pub use error::Hoi4ParserError;
 pub use generator::generate_document;
+pub use loc::{parse_loc, InlineNode, LocEntry, LocFile, LocWarning};
 pub use nested::{decode_nested_quoted, encode_nested_quoted};
 pub use perf::{benchmark_round_trip, BenchReport};
 pub use tokenizer::Token;
